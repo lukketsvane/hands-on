@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import * as handpose from "@tensorflow-models/handpose";
 import Webcam from "react-webcam";
 import { drawHand } from "../components/handposeutil";
@@ -22,6 +22,11 @@ import Metatags from "../components/metatags";
 import signDescriptions from "../components/signDescriptions.json";
 import '@tensorflow/tfjs-backend-webgl';
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const HOLD_DURATION = 2000; // 2 seconds in milliseconds
+const JITTER_THRESHOLD = 300; // 300ms threshold for ignoring brief interruptions
+const TRANSITION_DELAY = 500; // 500ms delay between letters
+
 function GestureGame() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
@@ -31,11 +36,40 @@ function GestureGame() {
   const [holdProgress, setHoldProgress] = useState(0);
   const [net, setNet] = useState(null);
   const GE = useRef(null);
-  const [correctSignStartTime, setCorrectSignStartTime] = useState(null);
   const [isDimmed, setIsDimmed] = useState(true);
+  const [imagesPreloaded, setImagesPreloaded] = useState(false);
+  
+  const correctSignStartTimeRef = useRef(null);
+  const lastCorrectTimeRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const isTransitioningRef = useRef(false);
 
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  // Preload images on mount
+  useEffect(() => {
+    const loadImages = async () => {
+      const loadPromises = ALPHABET.map((letter) => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = `/images/${letter}.png`;
+        });
+      });
 
+      try {
+        await Promise.all(loadPromises);
+        setImagesPreloaded(true);
+        console.log("All sign images preloaded successfully");
+      } catch (error) {
+        console.error("Error preloading images:", error);
+        setImagesPreloaded(true); // Continue anyway to not block the app
+      }
+    };
+
+    loadImages();
+  }, []);
+
+  // Load handpose model
   useEffect(() => {
     const loadHandposeModel = async () => {
       const model = await handpose.load();
@@ -48,122 +82,187 @@ function GestureGame() {
     loadHandposeModel();
   }, []);
 
-  useEffect(() => {
-    let animationFrameId;
+  // Handle sign detection with jitter protection
+  const handleSignDetection = useCallback((detectedSign) => {
+    if (isTransitioningRef.current) return;
 
-    const detect = async () => {
-      if (
-        webcamRef.current &&
-        webcamRef.current.video.readyState === 4 &&
-        net
-      ) {
-        const video = webcamRef.current.video;
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
+    const now = Date.now();
+    const isCorrectSign = detectedSign.toLowerCase() === currentLetter.toLowerCase();
 
-        webcamRef.current.video.width = videoWidth;
-        webcamRef.current.video.height = videoHeight;
-        canvasRef.current.width = videoWidth;
-        canvasRef.current.height = videoHeight;
+    if (isCorrectSign) {
+      lastCorrectTimeRef.current = now;
 
-        const hand = await net.estimateHands(video);
-
-        const ctx = canvasRef.current.getContext("2d");
-        ctx.clearRect(0, 0, videoWidth, videoHeight);
+      if (!correctSignStartTimeRef.current) {
+        correctSignStartTimeRef.current = now;
+        setHoldProgress(0);
+      } else {
+        const elapsedTime = now - correctSignStartTimeRef.current;
+        const progress = Math.min((elapsedTime / HOLD_DURATION) * 100, 100);
+        setHoldProgress(progress);
         
-        // Apply dimming effect
-        if (isDimmed) {
-          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-          ctx.fillRect(0, 0, videoWidth, videoHeight);
-        }
-
-        if (hand.length > 0) {
-          const estimatedGestures = await GE.current.estimate(
-            hand[0].landmarks,
-            7.5
-          );
-
-          if (
-            estimatedGestures.gestures &&
-            estimatedGestures.gestures.length > 0
-          ) {
-            const confidence = estimatedGestures.gestures.map(
-              (p) => p.confidence || p.score
-            );
-            const maxConfidence = confidence.indexOf(Math.max(...confidence));
-
-            if (
-              maxConfidence !== -1 &&
-              estimatedGestures.gestures[maxConfidence]
-            ) {
-              const detectedSign =
-                estimatedGestures.gestures[maxConfidence].name;
-              setCurrentSign(detectedSign);
-
-              if (gameState === "playing") {
-                if (detectedSign.toLowerCase() === currentLetter.toLowerCase()) {
-                  if (!correctSignStartTime) {
-                    setCorrectSignStartTime(Date.now());
-                    setHoldProgress(0);
-                  } else {
-                    const elapsedTime = Date.now() - correctSignStartTime;
-                    const progress = Math.min((elapsedTime / 2000) * 100, 100);
-                    setHoldProgress(progress);
-                    if (progress >= 100) {
-                      const nextIndex = alphabet.indexOf(currentLetter) + 1;
-                      if (nextIndex < alphabet.length) {
-                        setCurrentLetter(alphabet[nextIndex]);
-                      } else {
-                        setGameState("finished");
-                      }
-                      setCorrectSignStartTime(null);
-                      setHoldProgress(0);
-                    }
-                  }
-                } else {
-                  setCorrectSignStartTime(null);
-                  setHoldProgress(0);
-                }
-              }
-            } else {
-              setCurrentSign("?");
-              setCorrectSignStartTime(null);
-              setHoldProgress(0);
-            }
-          } else {
-            setCurrentSign("?");
-            setCorrectSignStartTime(null);
-            setHoldProgress(0);
-          }
-
-          drawHand(hand, ctx);
-        } else {
+        if (progress >= 100 && !isTransitioningRef.current) {
+          isTransitioningRef.current = true;
+          
+          // Reset current state
           setCurrentSign("?");
-          setCorrectSignStartTime(null);
           setHoldProgress(0);
+          correctSignStartTimeRef.current = null;
+          lastCorrectTimeRef.current = null;
+
+          // Delay the transition to next letter
+          setTimeout(() => {
+            const nextIndex = ALPHABET.indexOf(currentLetter) + 1;
+            if (nextIndex < ALPHABET.length) {
+              setCurrentLetter(ALPHABET[nextIndex]);
+            } else {
+              setGameState("finished");
+            }
+            
+            // Allow new detections after a brief pause
+            setTimeout(() => {
+              isTransitioningRef.current = false;
+            }, 200);
+          }, TRANSITION_DELAY);
         }
       }
+    } else {
+      // Only reset if we've exceeded the jitter threshold
+      const timeSinceLastCorrect = lastCorrectTimeRef.current ? now - lastCorrectTimeRef.current : Infinity;
+      
+      if (timeSinceLastCorrect > JITTER_THRESHOLD) {
+        correctSignStartTimeRef.current = null;
+        lastCorrectTimeRef.current = null;
+        setHoldProgress(0);
+      }
+    }
+  }, [currentLetter]);
 
-      animationFrameId = requestAnimationFrame(detect);
-    };
+  const detect = useCallback(async () => {
+    if (
+      webcamRef.current &&
+      webcamRef.current.video.readyState === 4 &&
+      net &&
+      canvasRef.current &&
+      !isTransitioningRef.current
+    ) {
+      const video = webcamRef.current.video;
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
 
-    detect();
+      // Calculate the scaling factor to fit the video within the canvas
+      const scale = Math.min(
+        canvasRef.current.width / videoWidth,
+        canvasRef.current.height / videoHeight
+      );
+      const scaledWidth = videoWidth * scale;
+      const scaledHeight = videoHeight * scale;
 
+      // Center the video on the canvas
+      const offsetX = (canvasRef.current.width - scaledWidth) / 2;
+      const offsetY = (canvasRef.current.height - scaledHeight) / 2;
+
+      canvasRef.current.width = videoWidth;
+      canvasRef.current.height = videoHeight;
+
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
+
+      if (isDimmed) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, videoWidth, videoHeight);
+      }
+
+      const hand = await net.estimateHands(video);
+
+      if (hand.length > 0) {
+        const estimatedGestures = await GE.current.estimate(hand[0].landmarks, 7.5);
+
+        if (estimatedGestures.gestures && estimatedGestures.gestures.length > 0) {
+          const confidence = estimatedGestures.gestures.map(
+            (p) => p.confidence
+          );
+          const maxConfidence = confidence.indexOf(
+            Math.max.apply(null, confidence)
+          );
+
+          if (!isTransitioningRef.current) {
+            const detectedSign = estimatedGestures.gestures[maxConfidence].name;
+            setCurrentSign(detectedSign);
+            handleSignDetection(detectedSign);
+          }
+        } else {
+          // Only handle as no sign if we haven't seen a correct sign recently
+          const now = Date.now();
+          const timeSinceLastCorrect = lastCorrectTimeRef.current ? now - lastCorrectTimeRef.current : Infinity;
+          
+          if (timeSinceLastCorrect > JITTER_THRESHOLD) {
+            setCurrentSign("?");
+            if (!isTransitioningRef.current) {
+              correctSignStartTimeRef.current = null;
+              lastCorrectTimeRef.current = null;
+              setHoldProgress(0);
+            }
+          }
+        }
+
+        drawHand(hand, ctx);
+      } else {
+        // Same jitter protection for when hand disappears
+        const now = Date.now();
+        const timeSinceLastCorrect = lastCorrectTimeRef.current ? now - lastCorrectTimeRef.current : Infinity;
+        
+        if (timeSinceLastCorrect > JITTER_THRESHOLD) {
+          setCurrentSign("?");
+          if (!isTransitioningRef.current) {
+            correctSignStartTimeRef.current = null;
+            lastCorrectTimeRef.current = null;
+            setHoldProgress(0);
+          }
+        }
+      }
+      ctx.restore();
+    }
+    rafIdRef.current = requestAnimationFrame(detect);
+  }, [net, isDimmed, handleSignDetection]);
+
+  useEffect(() => {
+    rafIdRef.current = requestAnimationFrame(detect);
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
     };
-  }, [net, gameState, currentLetter, isDimmed, correctSignStartTime]);
+  }, [detect]);
 
-  const restartGame = () => {
+  const restartGame = useCallback(() => {
+    isTransitioningRef.current = false;
     setGameState("playing");
     setCurrentLetter("A");
     setHoldProgress(0);
-    setCorrectSignStartTime(null);
-  };
+    correctSignStartTimeRef.current = null;
+    lastCorrectTimeRef.current = null;
+  }, []);
 
   return (
     <>
       <Metatags />
+      {/* Hidden preload container */}
+      <Box position="absolute" width="1px" height="1px" overflow="hidden" opacity="0" pointerEvents="none">
+        {ALPHABET.map((letter) => (
+          <Image
+            key={letter}
+            src={`/images/${letter}.png`}
+            alt={`Preload ${letter}`}
+            width="1px"
+            height="1px"
+          />
+        ))}
+      </Box>
+
       <Box
         bg="black"
         color="white"
@@ -173,7 +272,6 @@ function GestureGame() {
         position="relative"
         fontSize="sm"
       >
-        {/* Video Stream */}
         <Box
           position="fixed"
           top="0"
@@ -189,7 +287,7 @@ function GestureGame() {
               position: "absolute",
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               transform: "scaleX(-1)",
             }}
             videoConstraints={{
@@ -204,12 +302,12 @@ function GestureGame() {
               left: 0,
               width: "100%",
               height: "100%",
+              objectFit: "contain",
               transform: "scaleX(-1)",
             }}
           />
         </Box>
 
-        {/* Components Overlaid on Top */}
         <Box
           position="absolute"
           top="0"
@@ -260,15 +358,22 @@ function GestureGame() {
                         )}
                       </Box>
                     </Tooltip>
-                    <Flex alignItems="center" w="100%">
-                      <Image
-                        src={`/images/${currentLetter}.png`}
-                        alt={`Hand sign for ${currentLetter}`}
-                        maxH="150px"
-                        objectFit="contain"
-                        flex="2"
-                      />
-
+                    <Flex alignItems="center" w="100%" position="relative">
+                      {ALPHABET.map((letter) => (
+                        <Image
+                          key={letter}
+                          src={`/images/${letter}.png`}
+                          alt={`Hand sign for ${letter}`}
+                          maxH="150px"
+                          objectFit="contain"
+                          flex="2"
+                          position="absolute"
+                          top="0"
+                          left="0"
+                          opacity={currentLetter === letter ? 1 : 0}
+                          transition="opacity 0.3s ease-in-out"
+                        />
+                      ))}
                     </Flex>
                   </Box>
                 </GridItem>
@@ -300,11 +405,17 @@ function GestureGame() {
                     >
                       {currentSign.toUpperCase()}
                     </Text>
-                    <Box w="100%" bg="gray.800">
+                    <Box w="100%" bg="gray.800" overflow="hidden">
                       <Progress
                         value={holdProgress}
-                        colorScheme="whiteAlpha"
+                        colorScheme="green"
                         height="4px"
+                        transition="all 0.2s ease-in-out"
+                        sx={{
+                          '& > div:first-child': {
+                            transitionProperty: 'width',
+                          },
+                        }}
                       />
                     </Box>
                     <Flex alignItems="center" mt={2}>
@@ -326,8 +437,7 @@ function GestureGame() {
               </Grid>
             </VStack>
           )}
-
-          {gameState === "finished" && (
+{gameState === "finished" && (
             <VStack
               spacing={3}
               bg="rgba(0, 0, 0, 0.9)"
@@ -358,4 +468,3 @@ function GestureGame() {
 }
 
 export default GestureGame;
-
