@@ -13,8 +13,6 @@ import {
   VStack,
   Button,
   Tooltip,
-  Heading,
-  Container,
   Grid,
   GridItem,
 } from "@chakra-ui/react";
@@ -33,7 +31,6 @@ function GestureGame() {
   const [net, setNet] = useState(null);
   const GE = useRef(null);
   const [correctSignStartTime, setCorrectSignStartTime] = useState(null);
-  const [learnedLetters, setLearnedLetters] = useState([]);
 
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -51,33 +48,52 @@ function GestureGame() {
 
   useEffect(() => {
     let animationFrameId;
-  
+
     const detect = async () => {
-      if (webcamRef.current && webcamRef.current.video.readyState === 4 && net) {
+      if (
+        webcamRef.current &&
+        webcamRef.current.video.readyState === 4 &&
+        net
+      ) {
         const video = webcamRef.current.video;
         const videoWidth = video.videoWidth;
         const videoHeight = video.videoHeight;
-  
+
+        // Set video width and height
         webcamRef.current.video.width = videoWidth;
         webcamRef.current.video.height = videoHeight;
         canvasRef.current.width = videoWidth;
         canvasRef.current.height = videoHeight;
-  
+
         const hand = await net.estimateHands(video);
-  
+
         if (hand.length > 0) {
-          const estimatedGestures = await GE.current.estimate(hand[0].landmarks, 7.5);
-  
-          if (estimatedGestures.gestures && estimatedGestures.gestures.length > 0) {
-            const confidence = estimatedGestures.gestures.map((p) => p.confidence || p.score);
+          const estimatedGestures = await GE.current.estimate(
+            hand[0].landmarks,
+            7.5
+          );
+
+          if (
+            estimatedGestures.gestures &&
+            estimatedGestures.gestures.length > 0
+          ) {
+            const confidence = estimatedGestures.gestures.map(
+              (p) => p.confidence || p.score
+            );
             const maxConfidence = confidence.indexOf(Math.max(...confidence));
-  
-            if (maxConfidence !== -1 && estimatedGestures.gestures[maxConfidence]) {
-              const detectedSign = estimatedGestures.gestures[maxConfidence].name;
+
+            if (
+              maxConfidence !== -1 &&
+              estimatedGestures.gestures[maxConfidence]
+            ) {
+              const detectedSign =
+                estimatedGestures.gestures[maxConfidence].name;
               setCurrentSign(detectedSign);
-  
-              if (gameState === 'playing') {
-                if (detectedSign.toLowerCase() === currentLetter.toLowerCase()) {
+
+              if (gameState === "playing") {
+                if (
+                  detectedSign.toLowerCase() === currentLetter.toLowerCase()
+                ) {
                   if (!correctSignStartTime) {
                     setCorrectSignStartTime(Date.now());
                     setHoldProgress(0);
@@ -86,7 +102,6 @@ function GestureGame() {
                     const progress = (elapsedTime / 2000) * 100;
                     setHoldProgress(progress);
                     if (elapsedTime >= 2000) {
-                      setLearnedLetters((prev) => [...prev, currentLetter]);
                       const nextIndex = alphabet.indexOf(currentLetter) + 1;
                       if (nextIndex < alphabet.length) {
                         setCurrentLetter(alphabet[nextIndex]);
@@ -103,151 +118,187 @@ function GestureGame() {
                 }
               }
             } else {
-              setCurrentSign('?');
+              setCurrentSign("?");
               setCorrectSignStartTime(null);
               setHoldProgress(0);
             }
           } else {
-            setCurrentSign('?');
+            setCurrentSign("?");
             setCorrectSignStartTime(null);
             setHoldProgress(0);
           }
-  
-          const ctx = canvasRef.current.getContext('2d');
+
+          const ctx = canvasRef.current.getContext("2d");
           drawHand(hand, ctx);
         } else {
-          setCurrentSign('?');
+          setCurrentSign("?");
           setCorrectSignStartTime(null);
           setHoldProgress(0);
-          const ctx = canvasRef.current.getContext('2d');
+          const ctx = canvasRef.current.getContext("2d");
           ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
       }
-  
+
       animationFrameId = requestAnimationFrame(detect);
     };
-  
+
     detect();
-  
+
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
   }, [net, gameState, currentLetter]);
-  
+
   const restartGame = () => {
     setGameState("playing");
     setCurrentLetter("A");
     setHoldProgress(0);
     setCorrectSignStartTime(null);
-    setLearnedLetters([]);
   };
 
   return (
     <>
       <Metatags />
-      <Box bg="gray.900" color="white" minHeight="100vh" position="relative">
+      <Box
+        bg="black"
+        color="white"
+        minHeight="100vh"
+        width="100vw"
+        overflow="hidden"
+        position="relative"
+        fontSize="sm"
+      >
+        {/* Video Stream */}
         <Box
-          id="webcam-container"
-          position="absolute"
+          position="fixed"
           top="0"
           left="0"
           width="100%"
           height="100%"
           zIndex="0"
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          bg="black"
         >
-          <Webcam
-            id="webcam"
-            ref={webcamRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-          <canvas
-            id="gesture-canvas"
-            ref={canvasRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-            }}
-          />
+          <Box
+            position="relative"
+            // Use actual video dimensions
+            width={{ base: "100%", md: "auto" }}
+            height={{ base: "auto", md: "100%" }}
+          >
+            <Webcam
+              ref={webcamRef}
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+              }}
+              videoConstraints={{
+                facingMode: "user",
+              }}
+            />
+            <canvas
+              ref={canvasRef}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+              }}
+            />
+          </Box>
         </Box>
 
-        <Container maxW="container.xl" py={8} position="relative" zIndex="1">
+        {/* Components Overlaid on Top */}
+        <Box
+          position="absolute"
+          top="0"
+          left="0"
+          width="100%"
+          zIndex="1"
+          p={4}
+        >
           {gameState === "playing" && (
-            <VStack spacing={8} align="stretch">
-              <Heading as="h1" size="2xl" textAlign="center" color="brand.200">
-                Learn ASL: Letter {currentLetter}
-              </Heading>
-              <Grid templateColumns={["1fr", "1fr", "1fr 1fr"]} gap={8}>
+            <VStack spacing={4} align="stretch">
+              <Grid templateColumns={["1fr", "1fr 1fr"]} gap={4}>
                 <GridItem>
                   <Box
-                    border="2px solid"
-                    borderColor="brand.500"
-                    bg="rgba(0, 0, 0, 0.8)"
-                    h="full"
+                    border="1px solid"
+                    borderColor="white"
+                    bg="rgba(0, 0, 0, 0.9)"
+                    p={4}
                     display="flex"
                     justifyContent="center"
                     alignItems="center"
                     position="relative"
-                    borderRadius="lg"
-                    overflow="hidden"
-                    boxShadow="lg"
                   >
-                    <Tooltip label={`This is the ASL sign for the letter ${currentLetter}`} placement="top-start">
-                      <Box position="absolute" top={4} left={4} cursor="pointer">
-                        <Info size={24} color="#4FD1C5" />
+                    <Tooltip
+                      label={`This is the ASL sign for the letter ${currentLetter}`}
+                      placement="top-start"
+                      fontSize="xs"
+                    >
+                      <Box
+                        position="absolute"
+                        top={2}
+                        left={2}
+                        cursor="pointer"
+                      >
+                        <Info size={14} color="white" />
                       </Box>
                     </Tooltip>
                     <Image
                       src={`/images/asl_${currentLetter}.png`}
                       alt={`Hand sign for ${currentLetter}`}
-                      maxH="300px"
+                      maxH="150px"
                       objectFit="contain"
                     />
                   </Box>
                 </GridItem>
                 <GridItem>
                   <Box
-                    bg="rgba(0, 0, 0, 0.8)"
-                    border="2px solid"
-                    borderColor="brand.500"
-                    p={6}
+                    bg="rgba(0, 0, 0, 0.9)"
+                    border="1px solid"
+                    borderColor="white"
+                    p={4}
                     display="flex"
                     flexDirection="column"
                     alignItems="center"
                     justifyContent="center"
-                    h="full"
-                    borderRadius="lg"
-                    boxShadow="lg"
                   >
-                    <Text fontSize="xl" mb={4} textAlign="center" color="brand.100">
+                    <Text
+                      fontSize="xs"
+                      mb={2}
+                      textAlign="center"
+                      color="white"
+                    >
                       {signDescriptions[currentLetter]}
                     </Text>
-                    <Text fontSize="7xl" fontWeight="bold" textAlign="center" mb={6} color="brand.300">
-                      {currentSign}
+                    <Text
+                      fontSize="4xl"
+                      fontWeight="bold"
+                      textAlign="center"
+                      mb={3}
+                    >
+                      {currentSign.toUpperCase()}
                     </Text>
-                    <Box w="100%" bg="gray.700" borderRadius="full" overflow="hidden">
+                    <Box w="100%" bg="gray.800">
                       <Progress
                         value={holdProgress}
-                        colorScheme="brand"
-                        height="8px"
+                        colorScheme="whiteAlpha"
+                        height="4px"
                       />
                     </Box>
-                    <Flex alignItems="center" mt={4}>
-                      <Text fontSize="sm" textAlign="center" mr={2} color="gray.300">
+                    <Flex alignItems="center" mt={2}>
+                      <Text fontSize="xs" mr={1} color="gray.300">
                         Hold the correct sign
                       </Text>
-                      <Tooltip label="Hold the sign for 2 seconds to proceed" hasArrow>
+                      <Tooltip
+                        label="Hold the sign for 2 seconds to proceed"
+                        hasArrow
+                        fontSize="xs"
+                      >
                         <span>
-                          <Info size={18} color="#4FD1C5" />
+                          <Info size={12} color="gray.300" />
                         </span>
                       </Tooltip>
                     </Flex>
@@ -258,29 +309,33 @@ function GestureGame() {
           )}
 
           {gameState === "finished" && (
-            <VStack spacing={6} bg="rgba(0, 0, 0, 0.8)" p={8} borderRadius="lg" border="2px solid" borderColor="brand.500" boxShadow="lg">
-              <Heading as="h2" size="3xl" color="brand.300">
+            <VStack
+              spacing={3}
+              bg="rgba(0, 0, 0, 0.9)"
+              p={4}
+              border="1px solid"
+              borderColor="white"
+            >
+              <Heading as="h2" size="md" color="white">
                 Congratulations!
               </Heading>
-              <Text fontSize="xl" color="brand.100">You've learned all the letters!</Text>
+              <Text fontSize="sm" color="gray.300">
+                You've learned all the letters!
+              </Text>
               <Button
                 onClick={restartGame}
-                colorScheme="brand"
-                size="lg"
-                mt={4}
-                fontWeight="bold"
+                colorScheme="whiteAlpha"
+                size="sm"
+                mt={2}
               >
                 Start Over
               </Button>
             </VStack>
           )}
-        </Container>
+        </Box>
       </Box>
     </>
   );
 }
 
-export default function Home() {
-  return <GestureGame />;
-}
-
+export default GestureGame;
