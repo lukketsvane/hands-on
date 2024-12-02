@@ -3,7 +3,7 @@ import * as handpose from "@tensorflow-models/handpose";
 import Webcam from "react-webcam";
 import { drawHand } from "../components/handposeutil";
 import * as fp from "fingerpose";
-import HandSigns from "../components/handsigns";
+import Handsigns from "../components/handsigns"
 import {
   Box,
   Text,
@@ -15,8 +15,9 @@ import {
   Tooltip,
   Grid,
   GridItem,
+  Heading,
 } from "@chakra-ui/react";
-import { Info } from 'lucide-react';
+import { Info, Sun, Moon } from 'lucide-react';
 import Metatags from "../components/metatags";
 import signDescriptions from "../components/signDescriptions.json";
 import '@tensorflow/tfjs-backend-webgl';
@@ -31,6 +32,7 @@ function GestureGame() {
   const [net, setNet] = useState(null);
   const GE = useRef(null);
   const [correctSignStartTime, setCorrectSignStartTime] = useState(null);
+  const [isDimmed, setIsDimmed] = useState(true);
 
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -39,7 +41,7 @@ function GestureGame() {
       const model = await handpose.load();
       setNet(model);
       console.log("Handpose model loaded.");
-      const knownGestures = Object.values(HandSigns);
+      const knownGestures = Object.values(Handsigns);
       GE.current = new fp.GestureEstimator(knownGestures);
     };
 
@@ -59,13 +61,21 @@ function GestureGame() {
         const videoWidth = video.videoWidth;
         const videoHeight = video.videoHeight;
 
-        // Set video width and height
         webcamRef.current.video.width = videoWidth;
         webcamRef.current.video.height = videoHeight;
         canvasRef.current.width = videoWidth;
         canvasRef.current.height = videoHeight;
 
         const hand = await net.estimateHands(video);
+
+        const ctx = canvasRef.current.getContext("2d");
+        ctx.clearRect(0, 0, videoWidth, videoHeight);
+        
+        // Apply dimming effect
+        if (isDimmed) {
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+          ctx.fillRect(0, 0, videoWidth, videoHeight);
+        }
 
         if (hand.length > 0) {
           const estimatedGestures = await GE.current.estimate(
@@ -91,17 +101,15 @@ function GestureGame() {
               setCurrentSign(detectedSign);
 
               if (gameState === "playing") {
-                if (
-                  detectedSign.toLowerCase() === currentLetter.toLowerCase()
-                ) {
+                if (detectedSign.toLowerCase() === currentLetter.toLowerCase()) {
                   if (!correctSignStartTime) {
                     setCorrectSignStartTime(Date.now());
                     setHoldProgress(0);
                   } else {
                     const elapsedTime = Date.now() - correctSignStartTime;
-                    const progress = (elapsedTime / 2000) * 100;
+                    const progress = Math.min((elapsedTime / 2000) * 100, 100);
                     setHoldProgress(progress);
-                    if (elapsedTime >= 2000) {
+                    if (progress >= 100) {
                       const nextIndex = alphabet.indexOf(currentLetter) + 1;
                       if (nextIndex < alphabet.length) {
                         setCurrentLetter(alphabet[nextIndex]);
@@ -128,14 +136,11 @@ function GestureGame() {
             setHoldProgress(0);
           }
 
-          const ctx = canvasRef.current.getContext("2d");
           drawHand(hand, ctx);
         } else {
           setCurrentSign("?");
           setCorrectSignStartTime(null);
           setHoldProgress(0);
-          const ctx = canvasRef.current.getContext("2d");
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
       }
 
@@ -147,7 +152,7 @@ function GestureGame() {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [net, gameState, currentLetter]);
+  }, [net, gameState, currentLetter, isDimmed, correctSignStartTime]);
 
   const restartGame = () => {
     setGameState("playing");
@@ -176,37 +181,32 @@ function GestureGame() {
           width="100%"
           height="100%"
           zIndex="0"
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          bg="black"
+          overflow="hidden"
         >
-          <Box
-            position="relative"
-            // Use actual video dimensions
-            width={{ base: "100%", md: "auto" }}
-            height={{ base: "auto", md: "100%" }}
-          >
-            <Webcam
-              ref={webcamRef}
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "100%",
-              }}
-              videoConstraints={{
-                facingMode: "user",
-              }}
-            />
-            <canvas
-              ref={canvasRef}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-              }}
-            />
-          </Box>
+          <Webcam
+            ref={webcamRef}
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: "scaleX(-1)",
+            }}
+            videoConstraints={{
+              facingMode: "user",
+            }}
+          />
+          <canvas
+            ref={canvasRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              transform: "scaleX(-1)",
+            }}
+          />
         </Box>
 
         {/* Components Overlaid on Top */}
@@ -220,41 +220,59 @@ function GestureGame() {
         >
           {gameState === "playing" && (
             <VStack spacing={4} align="stretch">
-              <Grid templateColumns={["1fr", "1fr 1fr"]} gap={4}>
-                <GridItem>
+              <Grid templateColumns={["1fr", "1fr 2fr"]} gap={4}>
+                <GridItem h="full">
                   <Box
                     border="1px solid"
                     borderColor="white"
                     bg="rgba(0, 0, 0, 0.9)"
                     p={4}
                     display="flex"
-                    justifyContent="center"
                     alignItems="center"
                     position="relative"
+                    h="full"
                   >
                     <Tooltip
                       label={`This is the ASL sign for the letter ${currentLetter}`}
                       placement="top-start"
                       fontSize="xs"
                     >
-                      <Box
-                        position="absolute"
-                        top={2}
-                        left={2}
-                        cursor="pointer"
-                      >
+                      <Box position="absolute" top={2} left={2} cursor="pointer">
                         <Info size={14} color="white" />
                       </Box>
                     </Tooltip>
-                    <Image
-                      src={`/images/asl_${currentLetter}.png`}
-                      alt={`Hand sign for ${currentLetter}`}
-                      maxH="150px"
-                      objectFit="contain"
-                    />
+                    <Tooltip
+                      label={isDimmed ? "Brighten Video" : "Dim Video"}
+                      placement="top-start"
+                      fontSize="xs"
+                    >
+                      <Box
+                        position="absolute"
+                        top={2}
+                        right={2}
+                        cursor="pointer"
+                        onClick={() => setIsDimmed(!isDimmed)}
+                      >
+                        {isDimmed ? (
+                          <Sun size={14} color="white" />
+                        ) : (
+                          <Moon size={14} color="white" />
+                        )}
+                      </Box>
+                    </Tooltip>
+                    <Flex alignItems="center" w="100%">
+                      <Image
+                        src={`/images/${currentLetter}.png`}
+                        alt={`Hand sign for ${currentLetter}`}
+                        maxH="150px"
+                        objectFit="contain"
+                        flex="2"
+                      />
+
+                    </Flex>
                   </Box>
                 </GridItem>
-                <GridItem>
+                <GridItem h="full">
                   <Box
                     bg="rgba(0, 0, 0, 0.9)"
                     border="1px solid"
@@ -264,6 +282,7 @@ function GestureGame() {
                     flexDirection="column"
                     alignItems="center"
                     justifyContent="center"
+                    h="full"
                   >
                     <Text
                       fontSize="xs"
@@ -339,3 +358,4 @@ function GestureGame() {
 }
 
 export default GestureGame;
+

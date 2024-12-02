@@ -48,4 +48,3 @@ cSign.addDirection(Finger.Ring, FingerDirection.DiagonalUpRight, 0.70);
 //Pinky
 cSign.addCurl(Finger.Pinky, FingerCurl.HalfCurl, 1);
 cSign.addDirection(Finger.Pinky, FingerDirection.DiagonalUpRight, 0.70);
-
