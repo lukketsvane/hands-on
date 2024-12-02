@@ -1,313 +1,286 @@
-import React, { useRef, useState, useEffect } from "react"
-import * as tf from "@tensorflow/tfjs"
-import * as handpose from "@tensorflow-models/handpose"
-import Webcam from "react-webcam"
-import { drawHand } from "../components/handposeutil"
-import * as fp from "fingerpose"
-import Handsigns from "../components/handsigns"
-
+import React, { useRef, useState, useEffect } from "react";
+import * as handpose from "@tensorflow-models/handpose";
+import Webcam from "react-webcam";
+import { drawHand } from "../components/handposeutil";
+import * as fp from "fingerpose";
+import HandSigns from "../components/handsigns";
 import {
-  Text,
-  Heading,
-  Button,
-  Image,
-  Stack,
-  Container,
   Box,
+  Text,
+  Flex,
+  Image,
+  Progress,
   VStack,
-  ChakraProvider,
-} from "@chakra-ui/react"
+  Button,
+  Tooltip,
+  Heading,
+  Container,
+  Grid,
+  GridItem,
+} from "@chakra-ui/react";
+import { Info } from 'lucide-react';
+import Metatags from "../components/metatags";
+import signDescriptions from "../components/signDescriptions.json";
+import '@tensorflow/tfjs-backend-webgl';
 
-import { Signimage, Signpass } from "../components/handimage"
+function GestureGame() {
+  const webcamRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [currentSign, setCurrentSign] = useState("?");
+  const [currentLetter, setCurrentLetter] = useState("A");
+  const [gameState, setGameState] = useState("playing");
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [net, setNet] = useState(null);
+  const GE = useRef(null);
+  const [correctSignStartTime, setCorrectSignStartTime] = useState(null);
+  const [learnedLetters, setLearnedLetters] = useState([]);
 
-import About from "../components/about"
-import Metatags from "../components/metatags"
-
-// import "../styles/App.css"
-
-// import "@tensorflow/tfjs-backend-webgl"
-
-import { RiCameraFill, RiCameraOffFill } from "react-icons/ri"
-
-export default function Home() {
-  const webcamRef = useRef(null)
-  const canvasRef = useRef(null)
-
-  const [camState, setCamState] = useState("on")
-
-  const [sign, setSign] = useState(null)
-
-  let signList = []
-  let currentSign = 0
-
-  let gamestate = "started"
-
-  // let net;
-
-  async function runHandpose() {
-    const net = await handpose.load()
-    _signList()
-
-    // window.requestAnimationFrame(loop);
-
-    setInterval(() => {
-      detect(net)
-    }, 150)
-  }
-
-  function _signList() {
-    signList = generateSigns()
-  }
-
-  function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[a[i], a[j]] = [a[j], a[i]]
-    }
-    return a
-  }
-
-  function generateSigns() {
-    const password = shuffle(Signpass)
-    return password
-  }
-
-  async function detect(net) {
-    // Check data is available
-    if (
-      typeof webcamRef.current !== "undefined" &&
-      webcamRef.current !== null &&
-      webcamRef.current.video.readyState === 4
-    ) {
-      // Get Video Properties
-      const video = webcamRef.current.video
-      const videoWidth = webcamRef.current.video.videoWidth
-      const videoHeight = webcamRef.current.video.videoHeight
-
-      // Set video width
-      webcamRef.current.video.width = videoWidth
-      webcamRef.current.video.height = videoHeight
-
-      // Set canvas height and width
-      canvasRef.current.width = videoWidth
-      canvasRef.current.height = videoHeight
-
-      // Make Detections
-      const hand = await net.estimateHands(video)
-
-      if (hand.length > 0) {
-        //loading the fingerpose model
-        const GE = new fp.GestureEstimator([
-          fp.Gestures.ThumbsUpGesture,
-          Handsigns.aSign,
-          Handsigns.bSign,
-          Handsigns.cSign,
-          Handsigns.dSign,
-          Handsigns.eSign,
-          Handsigns.fSign,
-          Handsigns.gSign,
-          Handsigns.hSign,
-          Handsigns.iSign,
-          Handsigns.jSign,
-          Handsigns.kSign,
-          Handsigns.lSign,
-          Handsigns.mSign,
-          Handsigns.nSign,
-          Handsigns.oSign,
-          Handsigns.pSign,
-          Handsigns.qSign,
-          Handsigns.rSign,
-          Handsigns.sSign,
-          Handsigns.tSign,
-          Handsigns.uSign,
-          Handsigns.vSign,
-          Handsigns.wSign,
-          Handsigns.xSign,
-          Handsigns.ySign,
-          Handsigns.zSign,
-        ])
-
-        const estimatedGestures = await GE.estimate(hand[0].landmarks, 6.5)
-        // document.querySelector('.pose-data').innerHTML =JSON.stringify(estimatedGestures.poseData, null, 2);
-
-        if (gamestate === "started") {
-          document.querySelector("#app-title").innerText =
-            "Make a 👍 gesture with your hand to start"
-        }
-
-        if (
-          estimatedGestures.gestures !== undefined &&
-          estimatedGestures.gestures.length > 0
-        ) {
-          const confidence = estimatedGestures.gestures.map(p => p.confidence)
-          const maxConfidence = confidence.indexOf(
-            Math.max.apply(undefined, confidence)
-          )
-
-          //setting up game state, looking for thumb emoji
-          if (
-            estimatedGestures.gestures[maxConfidence].name === "thumbs_up" &&
-            gamestate !== "played"
-          ) {
-            _signList()
-            gamestate = "played"
-            document.getElementById("emojimage").classList.add("play")
-            document.querySelector(".tutor-text").innerText =
-              "make a hand gesture based on letter shown below"
-          } else if (gamestate === "played") {
-            document.querySelector("#app-title").innerText = ""
-
-            //looping the sign list
-            if (currentSign === signList.length) {
-              _signList()
-              currentSign = 0
-              return
-            }
-
-            // console.log(signList[currentSign].src.src)
-
-            //game play state
-
-            if (
-              typeof signList[currentSign].src.src === "string" ||
-              signList[currentSign].src.src instanceof String
-            ) {
-              document
-                .getElementById("emojimage")
-                .setAttribute("src", signList[currentSign].src.src)
-              if (
-                signList[currentSign].alt ===
-                estimatedGestures.gestures[maxConfidence].name
-              ) {
-                currentSign++
-              }
-              setSign(estimatedGestures.gestures[maxConfidence].name)
-            }
-          } else if (gamestate === "finished") {
-            return
-          }
-        }
-      }
-      // Draw hand lines
-      const ctx = canvasRef.current.getContext("2d")
-      drawHand(hand, ctx)
-    }
-  }
-
-  //   if (sign) {
-  //     console.log(sign, Signimage[sign])
-  //   }
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   useEffect(() => {
-    runHandpose()
-  }, [])
+    const loadHandposeModel = async () => {
+      const model = await handpose.load();
+      setNet(model);
+      console.log("Handpose model loaded.");
+      const knownGestures = Object.values(HandSigns);
+      GE.current = new fp.GestureEstimator(knownGestures);
+    };
 
-  function turnOffCamera() {
-    if (camState === "on") {
-      setCamState("off")
-    } else {
-      setCamState("on")
-    }
-  }
+    loadHandposeModel();
+  }, []);
+
+  useEffect(() => {
+    let animationFrameId;
+  
+    const detect = async () => {
+      if (webcamRef.current && webcamRef.current.video.readyState === 4 && net) {
+        const video = webcamRef.current.video;
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+  
+        webcamRef.current.video.width = videoWidth;
+        webcamRef.current.video.height = videoHeight;
+        canvasRef.current.width = videoWidth;
+        canvasRef.current.height = videoHeight;
+  
+        const hand = await net.estimateHands(video);
+  
+        if (hand.length > 0) {
+          const estimatedGestures = await GE.current.estimate(hand[0].landmarks, 7.5);
+  
+          if (estimatedGestures.gestures && estimatedGestures.gestures.length > 0) {
+            const confidence = estimatedGestures.gestures.map((p) => p.confidence || p.score);
+            const maxConfidence = confidence.indexOf(Math.max(...confidence));
+  
+            if (maxConfidence !== -1 && estimatedGestures.gestures[maxConfidence]) {
+              const detectedSign = estimatedGestures.gestures[maxConfidence].name;
+              setCurrentSign(detectedSign);
+  
+              if (gameState === 'playing') {
+                if (detectedSign.toLowerCase() === currentLetter.toLowerCase()) {
+                  if (!correctSignStartTime) {
+                    setCorrectSignStartTime(Date.now());
+                    setHoldProgress(0);
+                  } else {
+                    const elapsedTime = Date.now() - correctSignStartTime;
+                    const progress = (elapsedTime / 2000) * 100;
+                    setHoldProgress(progress);
+                    if (elapsedTime >= 2000) {
+                      setLearnedLetters((prev) => [...prev, currentLetter]);
+                      const nextIndex = alphabet.indexOf(currentLetter) + 1;
+                      if (nextIndex < alphabet.length) {
+                        setCurrentLetter(alphabet[nextIndex]);
+                      } else {
+                        setGameState("finished");
+                      }
+                      setCorrectSignStartTime(null);
+                      setHoldProgress(0);
+                    }
+                  }
+                } else {
+                  setCorrectSignStartTime(null);
+                  setHoldProgress(0);
+                }
+              }
+            } else {
+              setCurrentSign('?');
+              setCorrectSignStartTime(null);
+              setHoldProgress(0);
+            }
+          } else {
+            setCurrentSign('?');
+            setCorrectSignStartTime(null);
+            setHoldProgress(0);
+          }
+  
+          const ctx = canvasRef.current.getContext('2d');
+          drawHand(hand, ctx);
+        } else {
+          setCurrentSign('?');
+          setCorrectSignStartTime(null);
+          setHoldProgress(0);
+          const ctx = canvasRef.current.getContext('2d');
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+      }
+  
+      animationFrameId = requestAnimationFrame(detect);
+    };
+  
+    detect();
+  
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [net, gameState, currentLetter]);
+  
+  const restartGame = () => {
+    setGameState("playing");
+    setCurrentLetter("A");
+    setHoldProgress(0);
+    setCorrectSignStartTime(null);
+    setLearnedLetters([]);
+  };
 
   return (
-    <ChakraProvider>
+    <>
       <Metatags />
-      <Box bgColor="#5784BA">
-        <Container centerContent maxW="xl" height="100vh" pt="0" pb="0">
-          <VStack spacing={4} align="center">
-            <Box h="20px"></Box>
-            <Heading
-              as="h3"
-              size="md"
-              className="tutor-text"
-              color="white"
-              textAlign="center"
-            ></Heading>
-            <Box h="20px"></Box>
-          </VStack>
-
-          <Heading
-            as="h1"
-            size="lg"
-            id="app-title"
-            color="white"
-            textAlign="center"
-          >
-            🧙‍♀️ Loading the Magic 🧙‍♂️
-          </Heading>
-
-          <Box id="webcam-container">
-            {camState === "on" ? (
-              <Webcam id="webcam" ref={webcamRef} />
-            ) : (
-              <div id="webcam" background="black"></div>
-            )}
-
-            {sign ? (
-              <div
-                style={{
-                  position: "absolute",
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                  right: "calc(50% - 50px)",
-                  bottom: 100,
-                  textAlign: "-webkit-center",
-                }}
-              >
-                <Text color="white" fontSize="sm" mb={1}>
-                  detected gestures
-                </Text>
-                <img
-                  alt="signImage"
-                  src={
-                    Signimage[sign]?.src
-                      ? Signimage[sign].src
-                      : "/loveyou_emoji.svg"
-                  }
-                  style={{
-                    height: 30,
-                  }}
-                />
-              </div>
-            ) : (
-              " "
-            )}
-          </Box>
-
-          <canvas id="gesture-canvas" ref={canvasRef} style={{}} />
-
-          <Box
-            id="singmoji"
+      <Box bg="gray.900" color="white" minHeight="100vh" position="relative">
+        <Box
+          id="webcam-container"
+          position="absolute"
+          top="0"
+          left="0"
+          width="100%"
+          height="100%"
+          zIndex="0"
+        >
+          <Webcam
+            id="webcam"
+            ref={webcamRef}
             style={{
-              zIndex: 9,
-              position: "fixed",
-              top: "50px",
-              right: "30px",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
             }}
-          ></Box>
+          />
+          <canvas
+            id="gesture-canvas"
+            ref={canvasRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+            }}
+          />
+        </Box>
 
-          <Image h="150px" objectFit="cover" id="emojimage" />
-          {/* <pre className="pose-data" color="white" style={{position: 'fixed', top: '150px', left: '10px'}} >Pose data</pre> */}
+        <Container maxW="container.xl" py={8} position="relative" zIndex="1">
+          {gameState === "playing" && (
+            <VStack spacing={8} align="stretch">
+              <Heading as="h1" size="2xl" textAlign="center" color="brand.200">
+                Learn ASL: Letter {currentLetter}
+              </Heading>
+              <Grid templateColumns={["1fr", "1fr", "1fr 1fr"]} gap={8}>
+                <GridItem>
+                  <Box
+                    border="2px solid"
+                    borderColor="brand.500"
+                    bg="rgba(0, 0, 0, 0.8)"
+                    h="full"
+                    display="flex"
+                    justifyContent="center"
+                    alignItems="center"
+                    position="relative"
+                    borderRadius="lg"
+                    overflow="hidden"
+                    boxShadow="lg"
+                  >
+                    <Tooltip label={`This is the ASL sign for the letter ${currentLetter}`} placement="top-start">
+                      <Box position="absolute" top={4} left={4} cursor="pointer">
+                        <Info size={24} color="#4FD1C5" />
+                      </Box>
+                    </Tooltip>
+                    <Image
+                      src={`/images/asl_${currentLetter}.png`}
+                      alt={`Hand sign for ${currentLetter}`}
+                      maxH="300px"
+                      objectFit="contain"
+                    />
+                  </Box>
+                </GridItem>
+                <GridItem>
+                  <Box
+                    bg="rgba(0, 0, 0, 0.8)"
+                    border="2px solid"
+                    borderColor="brand.500"
+                    p={6}
+                    display="flex"
+                    flexDirection="column"
+                    alignItems="center"
+                    justifyContent="center"
+                    h="full"
+                    borderRadius="lg"
+                    boxShadow="lg"
+                  >
+                    <Text fontSize="xl" mb={4} textAlign="center" color="brand.100">
+                      {signDescriptions[currentLetter]}
+                    </Text>
+                    <Text fontSize="7xl" fontWeight="bold" textAlign="center" mb={6} color="brand.300">
+                      {currentSign}
+                    </Text>
+                    <Box w="100%" bg="gray.700" borderRadius="full" overflow="hidden">
+                      <Progress
+                        value={holdProgress}
+                        colorScheme="brand"
+                        height="8px"
+                      />
+                    </Box>
+                    <Flex alignItems="center" mt={4}>
+                      <Text fontSize="sm" textAlign="center" mr={2} color="gray.300">
+                        Hold the correct sign
+                      </Text>
+                      <Tooltip label="Hold the sign for 2 seconds to proceed" hasArrow>
+                        <span>
+                          <Info size={18} color="#4FD1C5" />
+                        </span>
+                      </Tooltip>
+                    </Flex>
+                  </Box>
+                </GridItem>
+              </Grid>
+            </VStack>
+          )}
+
+          {gameState === "finished" && (
+            <VStack spacing={6} bg="rgba(0, 0, 0, 0.8)" p={8} borderRadius="lg" border="2px solid" borderColor="brand.500" boxShadow="lg">
+              <Heading as="h2" size="3xl" color="brand.300">
+                Congratulations!
+              </Heading>
+              <Text fontSize="xl" color="brand.100">You've learned all the letters!</Text>
+              <Button
+                onClick={restartGame}
+                colorScheme="brand"
+                size="lg"
+                mt={4}
+                fontWeight="bold"
+              >
+                Start Over
+              </Button>
+            </VStack>
+          )}
         </Container>
-
-        <Stack id="start-button" spacing={4} direction="row" align="center">
-          <Button
-            leftIcon={
-              camState === "on" ? (
-                <RiCameraFill size={20} />
-              ) : (
-                <RiCameraOffFill size={20} />
-              )
-            }
-            onClick={turnOffCamera}
-            colorScheme="orange"
-          >
-            Camera
-          </Button>
-          <About />
-        </Stack>
       </Box>
-    </ChakraProvider>
-  )
+    </>
+  );
 }
+
+export default function Home() {
+  return <GestureGame />;
+}
+
