@@ -1,3 +1,5 @@
+"use client";
+
 const signDescriptions = {
   A: "Closed fist with thumb resting on the side",
   B: "Open hand with fingers together and thumb tucked",

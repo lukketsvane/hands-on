@@ -1,3 +1,5 @@
+"use client";
+
 import {aSign} from './Asign';
 import {bSign} from './Bsign';
 import {cSign} from './Csign';

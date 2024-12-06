@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Sun, Moon } from 'lucide-react'
+import { Video, Hand, EyeOff } from 'lucide-react'
 import signDescriptions from "@/components/signDescriptions"
 import "@tensorflow/tfjs-backend-webgl"
 
@@ -27,16 +27,34 @@ const GestureGame: React.FC = () => {
   const [gameState, setGameState] = useState<"playing" | "finished">("playing")
   const [holdProgress, setHoldProgress] = useState(0)
   const [net, setNet] = useState<handpose.HandPose | null>(null)
-  const [isDimmed, setIsDimmed] = useState(true)
+  const [displayMode, setDisplayMode] = useState<'full' | 'skeleton' | 'dimmed'>('dimmed')
   const [flash, setFlash] = useState(false)
   const [videoConstraints, setVideoConstraints] = useState({
-    facingMode: "user"
+    facingMode: "user",
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
   });
+  const [isMounted, setIsMounted] = useState(false);
+  const [error, setError] = useState<string | null>(null); // Added error state
 
   const GE = useRef<GestureEstimator | null>(null)
   const correctSignStart = useRef<number | null>(null)
   const lastCorrectTime = useRef<number | null>(null)
   const isTransitioning = useRef(false)
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setVideoConstraints({
+        facingMode: "user",
+        width: { ideal: window.innerWidth },
+        height: { ideal: window.innerHeight },
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const loadModel = async () => {
@@ -47,17 +65,27 @@ const GestureGame: React.FC = () => {
         console.log("Handpose model loaded.");
       } catch (error) {
         console.error("Error loading Handpose model:", error);
+        setError("Failed to load the hand detection model. Please try again later."); // Updated error handling
       }
     };
     loadModel();
   }, []);
 
   useEffect(() => {
-    setVideoConstraints({
-      width: { ideal: window.innerWidth },
-      height: { ideal: window.innerHeight },
-      facingMode: "user"
-    });
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        setVideoConstraints({
+          facingMode: "user",
+          width: { ideal: window.innerWidth },
+          height: { ideal: window.innerHeight },
+        });
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
   }, []);
 
   const handleSignDetection = useCallback(
@@ -118,20 +146,29 @@ const GestureGame: React.FC = () => {
     ) {
       const video = webcamRef.current.video;
       const { videoWidth, videoHeight } = video;
-      canvasRef.current.width = videoWidth;
-      canvasRef.current.height = videoHeight;
+      const canvasWidth = window.innerWidth;
+      const canvasHeight = (canvasWidth / videoWidth) * videoHeight;
+      canvasRef.current.width = canvasWidth;
+      canvasRef.current.height = canvasHeight;
       const ctx = canvasRef.current.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        setError("Failed to get canvas context. Please refresh the page."); // Updated error handling
+        return;
+      }
 
-      ctx.clearRect(0, 0, videoWidth, videoHeight);
-      
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
       ctx.save();
       ctx.scale(-1, 1);
-      ctx.translate(-videoWidth, 0);
-      
-      if (isDimmed) {
+      ctx.translate(-canvasWidth, 0);
+
+      if (displayMode === 'full') {
+        ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+      }
+
+      if (displayMode === 'dimmed') {
         ctx.fillStyle = "rgba(0, 0, 0, 1)";
-        ctx.fillRect(0, 0, videoWidth, videoHeight);
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       }
 
       try {
@@ -147,16 +184,19 @@ const GestureGame: React.FC = () => {
           } else {
             setCurrentSign("?");
           }
-          drawHand(hands, ctx);
+          if (displayMode !== 'full') {
+            await drawHand(hands, ctx);
+          }
         }
       } catch (error) {
         console.error("Error during hand estimation:", error);
+        setError("An error occurred during hand detection. Please try again."); // Updated error handling
       }
 
       ctx.restore();
     }
     requestAnimationFrame(detect);
-  }, [net, isDimmed, handleSignDetection]);
+  }, [net, displayMode, handleSignDetection]);
 
   useEffect(() => {
     const animationId = requestAnimationFrame(detect)
@@ -171,54 +211,69 @@ const GestureGame: React.FC = () => {
     correctSignStart.current = null
     lastCorrectTime.current = null
     setFlash(false)
+    setError(null); // Reset error on restart
+  }
+
+  const cycleDisplayMode = () => {
+    setDisplayMode(current => {
+      switch (current) {
+        case 'full': return 'skeleton';
+        case 'skeleton': return 'dimmed';
+        case 'dimmed': return 'full';
+      }
+    });
+  };
+
+  if (!isMounted) {
+    return null;
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0">
-        <Webcam
-          ref={webcamRef}
-          mirrored
-          audio={false}
-          videoConstraints={videoConstraints}
-          className={`absolute w-full h-full object-cover ${isDimmed ? 'invisible' : ''}`}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full pointer-events-none"
-        />
-      </div>
-      <div className="absolute inset-x-0 top-0 z-10">
+    <div className="relative w-screen h-screen overflow-hidden bg-black text-white">
+      <Webcam
+        ref={webcamRef}
+        mirrored
+        audio={false}
+        videoConstraints={videoConstraints}
+        className={`absolute inset-0 w-full h-full object-cover ${displayMode !== 'full' ? 'invisible' : ''}`}
+      />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
+      <div className="absolute inset-x-0 top-0 z-10 p-2 sm:p-4">
         {gameState === "playing" ? (
-          <Card className="m-4 bg-background/80 backdrop-blur-sm">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="flex items-center space-x-6">
-                <img
-                  src={`/images/asl_${currentLetter}.png`}
-                  alt={`Sign for letter ${currentLetter}`}
-                  className="w-48 h-48 object-contain bg-foreground"
-                />
-                <div>
-                  <h2 className="text-6xl font-bold mb-2">{currentLetter}</h2>
-                  <p className="text-xl text-muted-foreground">
-                    {signDescriptions[currentLetter as keyof typeof signDescriptions]}
-                  </p>
+          <Card className="bg-black/60 backdrop-blur-sm border-white/10">
+            <CardContent className="p-2 sm:p-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <img
+                    src={`/images/asl_${currentLetter}.png`}
+                    alt={`Sign for letter ${currentLetter}`}
+                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 object-contain bg-foreground"
+                  />
+                  <div className="text-center sm:text-left">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">{currentLetter}</h2>
+                    <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
+                      {signDescriptions[currentLetter as keyof typeof signDescriptions]}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-8xl font-bold mb-4">{currentSign}</span>
-                <Progress value={holdProgress} className="w-64 h-3" />
+                <div className="flex flex-col items-center sm:items-end mt-2 sm:mt-0">
+                  <span className="text-4xl sm:text-5xl md:text-6xl font-bold">{currentSign}</span>
+                  <Progress value={holdProgress} className="w-32 sm:w-48 h-2 mt-2 bg-white/20" />
+                </div>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="m-4 bg-background/80 backdrop-blur-sm">
-            <CardContent className="flex flex-col items-center p-6">
-              <h2 className="text-5xl font-bold mb-4">Congratulations!</h2>
-              <p className="text-2xl text-center mb-6">
+          <Card className="bg-black/60 backdrop-blur-sm border-white/10">
+            <CardContent className="text-center">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">Congratulations!</h2>
+              <p className="text-lg sm:text-xl md:text-2xl mb-6">
                 You've learned all the letters in the alphabet!
               </p>
-              <Button onClick={restartGame} className="text-xl px-8 py-4">Start Over</Button>
+              <Button onClick={restartGame} className="text-lg sm:text-xl px-6 sm:px-8 py-2 sm:py-4">Start Over</Button>
             </CardContent>
           </Card>
         )}
@@ -229,20 +284,41 @@ const GestureGame: React.FC = () => {
             <Button
               variant="outline"
               size="icon"
-              className="absolute top-4 right-4 z-20 bg-background/50 hover:bg-background/70"
-              onClick={() => setIsDimmed(!isDimmed)}
+              className="absolute bottom-4 right-4 z-20 bg-white/10 hover:bg-white/20 border-white/20"
+              onClick={cycleDisplayMode}
             >
-              {isDimmed ? <Moon className="h-8 w-8" /> : <Sun className="h-8 w-8" />}
-              <span className="sr-only">{isDimmed ? 'Show video feed' : 'Hide video feed'}</span>
+              {displayMode === 'full' ? (
+                <Video className="h-5 w-5 sm:h-6 sm:w-6" />
+              ) : displayMode === 'skeleton' ? (
+                <Hand className="h-5 w-5 sm:h-6 sm:w-6" />
+              ) : (
+                <EyeOff className="h-5 w-5 sm:h-6 sm:w-6" />
+              )}
+              <span className="sr-only">
+                {displayMode === 'full' ? 'Show hand skeleton' : displayMode === 'skeleton' ? 'Hide video feed' : 'Show full video'}
+              </span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isDimmed ? 'Show video feed' : 'Hide video feed'}</p>
+            <p>{displayMode === 'full' ? 'Show hand skeleton' : displayMode === 'skeleton' ? 'Hide video feed' : 'Show full video'}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       {flash && (
-        <div className="absolute inset-0 bg-green-500 opacity-50 animate-flash" />
+        <div className="absolute inset-0 bg-white opacity-50 animate-flash" />
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <Card className="max-w-md mx-4">
+            <CardContent className="p-4">
+              <h2 className="text-xl font-bold mb-2">Error</h2>
+              <p className="text-sm">{error}</p>
+              <Button onClick={() => window.location.reload()} className="mt-4">
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )
