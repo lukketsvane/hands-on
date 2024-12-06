@@ -2,7 +2,7 @@
 title: "Hand Tracking for Sign Language"
 description: "Building an ASL recognition system through the lens of machine learning, computer vision, and human gesture interpretation"
 date: "2024-12-02"
-tags: ["sign language", "machine learning", "computer vision", "accessibility", "gesture recognition"]
+tags: ["sign language", "machine learning", "computer vision", "accessibility", "gesture recognition", "advent-of-code"]
 thumbnails: [
   { src: "https://i.ibb.co/nDkJ0PJ/asl-A.png", alt: "ASL letter A" },
   { src: "https://i.ibb.co/QnVMGjS/asl-B.png", alt: "ASL letter B" },
@@ -10,9 +10,10 @@ thumbnails: [
 ]
 type: "technical"
 ---
+
 import { ImageGallery } from "@/components/image-gallery"
 
-The human hand, with its 27 degrees of freedom across 27 bones, represents one of nature's most sophisticated biomechanical systems. In American Sign Language (ASL), this remarkable instrument becomes a canvas for linguistic expression, where each gesture carries precise semantic meaning. You can try out my implementation of digital sign language recognition at [https://handson.iverfinne.no](https://handson.iverfinne.no). This journey into digital sign language recognition begins with understanding how to capture this complexity in code.
+The human hand, with its network of 27 bones and tendons, functions as a precise biomechanical system. In American Sign Language (ASL), this instrument becomes a medium for linguistic expression, where each gesture carries specific semantic meaning. Through this project at [handson.iverfinne.no](https://handson.iverfinne.no), we explore the technical challenges of translating these physical movements into digital understanding.
 
 <ImageGallery
   images={[
@@ -25,13 +26,17 @@ The human hand, with its 27 degrees of freedom across 27 bones, represents one o
   ]}
 />
 
+## The Digital Mirror: Machine Learning Meets Human Gesture
+
+Our implementation approaches hand tracking through a multi-layered system that processes visual input similar to human visual perception. Each frame undergoes systematic analysis:
+
 > **Gestural Topology**: The systematic mapping of hand configurations into discrete, recognizable states.
-> 
+>
 > *Like phonemes in spoken language, ASL hand positions form a finite set of meaningful units.*
 
-## The Digital Hand Model
+### Technical Implementation
 
-The system models hand gestures through three fundamental lenses:
+The system processes hand gestures through three key components:
 
 **1. Spatial Configuration**
 ```typescript
@@ -58,7 +63,7 @@ interface ASLSign {
 
 > **Critical Points**: Specific hand features that distinguish one sign from another.
 > 
-> *For example, the difference between 'U' and 'V' lies primarily in finger spacing.*
+> *For example, the difference between 'U' and 'V' lies in finger spacing.*
 
 **3. Temporal Analysis**
 ```typescript
@@ -74,34 +79,22 @@ class MotionTracker {
 }
 ```
 
-## Pattern Recognition Architecture
+## Performance Optimization
 
-The implementation processes hand gestures through a multi-stage pipeline that mirrors human visual cognition:
+The implementation focuses on practical performance through:
 
-1. **Feature Extraction**: Raw camera input transforms into a 21-point skeletal model
-2. **Pose Estimation**: These points map to predefined hand configurations
-3. **Temporal Integration**: For dynamic signs, movement patterns are analyzed
-4. **Semantic Classification**: Final mapping to ASL letters and numbers
+1. **Frame Buffering**: Reduces detection jitter
+2. **Confidence Thresholding**: Filters uncertain predictions
+3. **WebGL Acceleration**: Utilizes GPU for processing
+4. **State Management**: Minimizes render cycles
 
-> **Gesture Space**: The three-dimensional volume within which meaningful hand movements occur.
-> 
-> *This space is normalized to account for different hand sizes and camera distances.*
+## Future Development
 
-The implementation leverages **TensorFlow.js** for real-time processing and employs WebGL acceleration for performance optimization:
+The project roadmap includes:
 
-```typescript
-interface GestureProcessor {
-  // Confidence threshold for sign recognition
-  readonly CONFIDENCE_THRESHOLD = 0.85;
-  
-  // Processing window for dynamic gestures
-  readonly TEMPORAL_WINDOW = 500; // milliseconds
-  
-  // Method to calculate gesture likelihood
-  calculateConfidence(observation: HandPosition): number {
-    return /* probabilistic matching algorithm */;
-  }
-}
-```
+1. Support for dynamic gestures
+2. Multi-hand tracking capabilities
+3. Integration with learning curricula
+4. Expanded gesture vocabulary
 
-Each letter in the ASL alphabet represents a unique point in this high-dimensional gesture space, defined by precise finger positions, orientations, and in some cases, motion patterns. The system must navigate this space efficiently while maintaining robustness to natural variations in human movement.
+This project demonstrates how web technologies can create practical tools for sign language learning, combining technical capability with educational utility.
