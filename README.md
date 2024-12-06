@@ -1,91 +1,95 @@
-<!-- AUTO-GENERATED-CONTENT:START (STARTER) -->
-<p align="center">
-  <a href="https://handsign-tensorflow.vercel.app">
-    <img alt="Handsign logo" src="./public/loveyou_emoji.svg" width="80" />
-  </a>
-</p>
-<h1 align="center">
-  Handsign - ASL Hand Gesture Detection Using TensorFlow
-</h1>
+# Hands-On: ASL Learning Platform
 
-Handsign is a simple AI-based hand gesture recognition that translates a hand pose into the American Sign Language (ASL) alphabet. Using Tensorflow JS and its Handpose preloaded model to detect the hand object and its parts. Handsign also uses an additional library called Fingerpose to classify certain of custom hand gestures based on the finger position.
+An interactive American Sign Language learning platform using computer vision and machine learning. Try it live at [https://handson.iverfinne.no](https://handson.iverfinne.no)
 
-`#dohackathon` `#madewithTFJS`
+## Features
 
-![Handsign demo](https://media.giphy.com/media/3KCaNFPTP7ShM7V8jd/giphy.gif)
+- Real-time hand tracking and gesture recognition
+- Interactive ASL alphabet learning
+- Progressive difficulty system
+- Visual feedback and gesture guides
+- Responsive design for various devices
+- Dark/light mode support
 
-## [See Demo](https://handsign-tensorflow.vercel.app)
+## Tech Stack
 
-# Installation
+- Next.js 14
+- React
+- TensorFlow.js
+- Handpose model
+- Tailwind CSS
+- shadcn/ui components
+- TypeScript
 
-1. **Clone the repository**
+## Getting Started
 
-```shell
-# copy the repo to your machine
+### Prerequisites
 
-git clone https://github.com/syauqy/handsign-tensorflow.git
+- Node.js 18+
+- npm or yarn
+- Webcam access
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/lukketsvane/hands-on.git
+
+# Navigate to project directory
+cd hands-on
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-2. **Start the project**
+Visit `http://localhost:3000` to see the application.
 
-```shell
-# move to the project folder and install all dependencies
+### Environment Setup
 
-cd handsign-tensorflow
-yarn install
+Create a `.env.local` file in the root directory:
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-3. **Run the project on your local machine**
+## Project Structure
 
-```shell
-# run Next
-
-yarn dev
+```
+hands-on/
+├── app/                 # Next.js app directory
+├── components/          # React components
+│   ├── GestureGame.tsx # Main game component
+│   ├── handsigns/      # ASL sign definitions
+│   └── ui/             # UI components
+├── lib/                 # Utility functions
+└── public/             # Static assets
+    └── images/         # ASL reference images
 ```
 
-4. **The project is live 🚀**
+## Usage
 
-Your project is live and running at `http://localhost:3000`
+1. Allow camera access when prompted
+2. Follow the on-screen instructions to learn ASL letters
+3. Hold each sign steady for 2 seconds to progress
+4. Toggle video feed visibility with the sun/moon button
 
-You can edit the core program at `/pages/index.js`
+## Contributing
 
-# What's inside the project
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Extract the fingerpose data
+## License
 
-uncomment the `<pre>` component
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
 
-```js
-<Image h="150px" objectFit="cover" id='emojimage'/>
+## Acknowledgments
 
-// uncomment this
-{/* <pre className="pose-data" color="white" style={{position: 'fixed', top: '150px', left: '10px'}} >Pose data</pre> */}
-
-</Container>
-```
-
-uncomment the `estimatedGestures` data to change `'.pose-data'` innerHTML
-
-```js
-// document.querySelector('.pose-data').innerHTML =JSON.stringify(estimatedGestures.poseData, null, 2);
-```
-
-the `estimatedGestures` data will render on your screen.
-
-# References & Libraries
-
-- [Tensorflow JS](https://www.tensorflow.org/js) - A Library for ML in JS.
-
-- [Handpose](https://github.com/tensorflow/tfjs-models/tree/master/handpose) - A lightweight ML pipeline consisting of two models: A palm detector and a hand-skeleton finger tracking model.
-
-- [Fingerpose](https://github.com/andypotato/fingerpose) - A pose classifier for hand landmarks detected by TensorFlow.js Handpose's model.
-
-- Sign language illustration is created by [Pelin Kahraman](https://thenounproject.com/pelodrome/)
-
-If you want to learn more about Tensorflow JS and custom gesture handpose, please kindly check these amazing videos
-
-- [Machine Learning with TensorFlow in JavaScript](https://www.youtube.com/watch?v=WIHZ7kjJ35o) - by [Jason Lengstorf](https://github.com/jlengstorf) and [Jason Mayes](https://github.com/jasonmayes)
-
-- [Building a Real Time Sign Language Detection App with React.JS and Tensorflow.JS](https://www.youtube.com/watch?v=ZTSRZt04JkY) - by [Nicholas Renotte](https://github.com/nicknochnack)
-
-<!-- AUTO-GENERATED-CONTENT:END -->
+- TensorFlow.js team for the Handpose model
+- shadcn for the UI components
+- The ASL community for feedback and guidance
