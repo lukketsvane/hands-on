@@ -241,43 +241,96 @@ const GestureGame: React.FC = () => {
         ref={canvasRef}
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
-      <div className="absolute inset-x-0 top-0 z-10 p-2 sm:p-4">
+
+      {/* Desktop Layout */}
+      <div className="hidden sm:flex absolute inset-0 z-10">
+        {gameState === "playing" ? (
+          <div className="flex w-full h-full">
+            {/* Left Panel */}
+            <div className="w-1/2 h-full border-r border-white/10 p-8 flex items-center justify-center">
+              <div className="relative w-full max-w-lg aspect-square">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[20rem] font-bold text-white/20">{currentLetter}</span>
+                </div>
+                <img
+                  src={`/images/asl_${currentLetter}.png`}
+                  alt={`Sign for letter ${currentLetter}`}
+                  className="relative z-10 w-full h-full object-contain"
+                />
+              </div>
+            </div>
+
+            {/* Right Panel */}
+            <div className="w-1/2 h-full p-8 flex flex-col items-center justify-between">
+              <div className="w-full max-w-2xl space-y-8">
+                <p className="text-2xl text-center leading-relaxed">
+                  {signDescriptions[currentLetter as keyof typeof signDescriptions]}
+                </p>
+                <div className="flex flex-col items-center justify-center flex-1">
+                  <span className="text-[12rem] font-bold mb-4">{currentSign}</span>
+                  <Progress value={holdProgress} className="w-64 h-2 bg-white/20" />
+                  <p className="mt-4 text-xl text-white/60">Hold the correct sign</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <Card className="bg-transparent border-white/10">
+              <CardContent className="text-center p-8">
+                <h2 className="text-5xl font-bold mb-4">Congratulations!</h2>
+                <p className="text-2xl mb-8">
+                  You've learned all the letters in the alphabet!
+                </p>
+                <Button
+                  onClick={restartGame}
+                  className="text-xl px-8 py-4 bg-white text-black hover:bg-white/90"
+                >
+                  Start Over
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="sm:hidden absolute inset-x-0 top-0 z-10 p-2">
         {gameState === "playing" ? (
           <Card className="bg-black/60 backdrop-blur-sm border-white/10">
-            <CardContent className="p-2 sm:p-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <img
-                    src={`/images/asl_${currentLetter}.png`}
-                    alt={`Sign for letter ${currentLetter}`}
-                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 object-contain bg-foreground"
-                  />
-                  <div className="text-center sm:text-left">
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">{currentLetter}</h2>
-                    <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
-                      {signDescriptions[currentLetter as keyof typeof signDescriptions]}
-                    </p>
-                  </div>
+            <CardContent className="p-2">
+              <div className="flex flex-col items-center space-y-4">
+                <img
+                  src={`/images/asl_${currentLetter}.png`}
+                  alt={`Sign for letter ${currentLetter}`}
+                  className="w-32 h-32 object-contain"
+                />
+                <div className="text-center">
+                  <h2 className="text-4xl font-bold">{currentLetter}</h2>
+                  <p className="text-sm text-white/60 mt-1">
+                    {signDescriptions[currentLetter as keyof typeof signDescriptions]}
+                  </p>
                 </div>
-                <div className="flex flex-col items-center sm:items-end mt-2 sm:mt-0">
-                  <span className="text-4xl sm:text-5xl md:text-6xl font-bold">{currentSign}</span>
-                  <Progress value={holdProgress} className="w-32 sm:w-48 h-2 mt-2 bg-white/20" />
+                <div className="flex flex-col items-center">
+                  <span className="text-6xl font-bold">{currentSign}</span>
+                  <Progress value={holdProgress} className="w-32 h-2 mt-2 bg-white/20" />
                 </div>
               </div>
             </CardContent>
           </Card>
         ) : (
           <Card className="bg-black/60 backdrop-blur-sm border-white/10">
-            <CardContent className="text-center">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">Congratulations!</h2>
-              <p className="text-lg sm:text-xl md:text-2xl mb-6">
+            <CardContent className="text-center p-4">
+              <h2 className="text-3xl font-bold mb-2">Congratulations!</h2>
+              <p className="text-lg mb-4">
                 You've learned all the letters in the alphabet!
               </p>
-              <Button onClick={restartGame} className="text-lg sm:text-xl px-6 sm:px-8 py-2 sm:py-4">Start Over</Button>
+              <Button onClick={restartGame} className="text-lg px-6 py-2">Start Over</Button>
             </CardContent>
           </Card>
         )}
       </div>
+
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -288,11 +341,11 @@ const GestureGame: React.FC = () => {
               onClick={cycleDisplayMode}
             >
               {displayMode === 'full' ? (
-                <Video className="h-5 w-5 sm:h-6 sm:w-6" />
+                <Video className="h-5 w-5" />
               ) : displayMode === 'skeleton' ? (
-                <Hand className="h-5 w-5 sm:h-6 sm:w-6" />
+                <Hand className="h-5 w-5" />
               ) : (
-                <EyeOff className="h-5 w-5 sm:h-6 sm:w-6" />
+                <EyeOff className="h-5 w-5" />
               )}
               <span className="sr-only">
                 {displayMode === 'full' ? 'Show hand skeleton' : displayMode === 'skeleton' ? 'Hide video feed' : 'Show full video'}
@@ -304,16 +357,21 @@ const GestureGame: React.FC = () => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+
       {flash && (
         <div className="absolute inset-0 bg-white opacity-50 animate-flash" />
       )}
+
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <Card className="max-w-md mx-4">
+          <Card className="max-w-md mx-4 bg-black border-white/10">
             <CardContent className="p-4">
               <h2 className="text-xl font-bold mb-2">Error</h2>
               <p className="text-sm">{error}</p>
-              <Button onClick={() => window.location.reload()} className="mt-4">
+              <Button
+                onClick={() => window.location.reload()}
+                className="mt-4 bg-white text-black hover:bg-white/90"
+              >
                 Retry
               </Button>
             </CardContent>
