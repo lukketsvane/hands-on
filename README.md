@@ -84,12 +84,3 @@ hands-on/
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## Acknowledgments
-
-- TensorFlow.js team for the Handpose model
-- shadcn for the UI components
-- The ASL community for feedback and guidance
